@@ -55,8 +55,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    // Impriem 
-    printf("Servidor rodando na porta %s\n", inet_ntoa(servaddr.sin_addr));
+    // Imprime endereço e porta
+    printf("Servidor rodando no endereço %s\n", inet_ntoa(servaddr.sin_addr));
     printf("Servidor rodando na porta %d\n", ntohs(servaddr.sin_port));
 
     // Captura da mensagem do stdin
