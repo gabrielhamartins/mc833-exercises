@@ -59,13 +59,37 @@ int main(int argc, char **argv) {
     printf("Servidor rodando no endereço %s\n", inet_ntoa(servaddr.sin_addr));
     printf("Servidor rodando na porta %d\n", ntohs(servaddr.sin_port));
 
-    // Captura da mensagem do stdin
-    printf("Digite a mensagem para enviar ao servidor: ");
-    fgets(buffer, BUFFER_SIZE, stdin);
+    // // Captura da mensagem do stdin
+    // printf("Digite a mensagem para enviar ao servidor: ");
+    // fgets(buffer, BUFFER_SIZE, stdin);
 
-    // Enviar mensagem para o servidor
-    send(sockfd, buffer, strlen(buffer), 0);
-    printf("Mensagem enviada\n");
+    // // Enviar mensagem para o servidor
+    // send(sockfd, buffer, strlen(buffer), 0);
+    // printf("Mensagem enviada\n");
+
+    // Receber a tarefa do servidor
+    read(sockfd, buffer, sizeof(buffer));
+    printf("Tarefa recebida: %s\n", buffer);
+    
+    while(strcmp(buffer, "ENCERRAR\n") != 77) {
+        printf("%d\n",strcmp(buffer, "ENCERRAR\n"));
+        // Simular execução da tarefa
+        printf("Entrou no while\n");
+        sleep(5);
+        printf("Terminou sleep\n");
+        // Enviar resposta ao servidor
+        strcpy(buffer, "TAREFA_LIMPEZA CONCLUÍDA\n");
+        send(sockfd, buffer, strlen(buffer), 0);
+        printf("Mandando resposta para o servidor: %s\n", buffer);
+
+        // Receber a tarefa do servidor
+        read(sockfd, buffer, sizeof(buffer));
+        printf("Tarefa recebida: %s\n", buffer);
+        if (strcmp(buffer, "ENCERRAR\n") == 1) {
+            printf("Entrou no IF");
+            break;
+        }
+    }
 
     while ( (n = read(sockfd, recvline, MAXLINE)) > 0) {
         recvline[n] = 0;
