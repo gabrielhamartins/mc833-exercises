@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
     struct sockaddr_in servaddr;
     socklen_t len;
     char buffer[BUFFER_SIZE] = {0};
+    char end[BUFFER_SIZE] = "ENCERRAR\n";
 
     if (argc != 2) {
         strcpy(error,"uso: ");
@@ -71,7 +72,7 @@ int main(int argc, char **argv) {
     read(sockfd, buffer, sizeof(buffer));
     printf("Tarefa recebida: %s\n", buffer);
     
-    while(strcmp(buffer, "ENCERRAR\n") != 77) {
+    while(strcmp(buffer, end) != 77) {
         printf("%d\n",strcmp(buffer, "ENCERRAR\n"));
         // Simular execução da tarefa
         printf("Entrou no while\n");

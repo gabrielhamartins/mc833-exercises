@@ -22,6 +22,7 @@ int main (int argc, char **argv) {
     // time_t ticks;
     socklen_t len, len_client;
     char buffer[BUFFER_SIZE] = {0};
+    char end[BUFFER_SIZE] = "ENCERRAR\n";
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("socket");
@@ -98,7 +99,7 @@ int main (int argc, char **argv) {
             }
 
             // Encerrar
-            strcpy(buffer, "ENCERRAR\n");
+            strcpy(buffer, end);
             send(connfd, buffer, strlen(buffer), 0);
 
 
