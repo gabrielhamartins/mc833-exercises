@@ -22,6 +22,9 @@ int main (int argc, char **argv) {
     // time_t ticks;
     socklen_t len, len_client;
     char buffer[BUFFER_SIZE] = {0};
+    char message_received[BUFFER_SIZE];
+    char message_sent[BUFFER_SIZE];
+
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("socket");
@@ -77,28 +80,29 @@ int main (int argc, char **argv) {
 
             for(int i=0; i<3; i++) {
                 // Enviar tarefa para o cliente
-                strcpy(buffer, "LIMPEZA\n");
+                strcpy(buffer, "LIMPEZA");
                 send(connfd, buffer, strlen(buffer), 0);
                 printf("Enviou tarefa para o cliente: %s\n", buffer);
+                strcpy(message_sent, buffer);
 
                 // Receber resposta do cliente
                 read(connfd, buffer, sizeof(buffer));
                 printf("Resposta - Cliente IP %s, Porta %d: %s\n", 
                 inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), buffer);
+                strcpy(message_received, buffer);
 
                 // Log das interações em arquivo
                 FILE *log = fopen("log.txt", "a");
-                fprintf(log, "Cliente IP %s, Porta %d: Tarefa Enviada: LIMPEZA, Resposta: %s\n",
-                        inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), buffer);
+                fprintf(log, "[%s:%d] Tarefa Enviada: %s | Resposta: %s\n",
+                        inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), message_sent, message_received);
                 fclose(log);
             }
 
             // Encerrar
             strcpy(buffer, "ENCERRAR");
             send(connfd, buffer, strlen(buffer), 0);
-            
-            char last_message[BUFFER_SIZE];
-            strcpy(last_message, "ENCERRAR");
+
+            strcpy(message_received, "ENCERRAR");
 
             // Limpar o buffer antes de ler nova mensagem
             memset(buffer, 0, sizeof(buffer));
@@ -110,8 +114,8 @@ int main (int argc, char **argv) {
 
             // Log das interações em arquivo
             FILE *log = fopen("log.txt", "a");
-            fprintf(log, "Cliente IP %s, Porta %d: Tarefa Enviada: %s, Resposta: %s\n",
-                    inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), last_message, buffer);
+            fprintf(log, "[%s:%d] Tarefa Enviada: %s | Resposta: %s\n",
+                    inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), message_received, buffer);
             fclose(log);
 
             // Fechar conexão após finalizar
