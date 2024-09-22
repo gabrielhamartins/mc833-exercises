@@ -20,7 +20,6 @@ int main(int argc, char **argv) {
     struct sockaddr_in servaddr;
     socklen_t len;
     char buffer[BUFFER_SIZE] = {0};
-    char end[BUFFER_SIZE] = "ENCERRAR\n";
 
     if (argc != 2) {
         strcpy(error,"uso: ");
@@ -59,37 +58,37 @@ int main(int argc, char **argv) {
     // Imprime endereço e porta
     printf("Servidor rodando no endereço %s\n", inet_ntoa(servaddr.sin_addr));
     printf("Servidor rodando na porta %d\n", ntohs(servaddr.sin_port));
-
-    // // Captura da mensagem do stdin
-    // printf("Digite a mensagem para enviar ao servidor: ");
-    // fgets(buffer, BUFFER_SIZE, stdin);
-
-    // // Enviar mensagem para o servidor
-    // send(sockfd, buffer, strlen(buffer), 0);
-    // printf("Mensagem enviada\n");
-
-    // Receber a tarefa do servidor
-    read(sockfd, buffer, sizeof(buffer));
-    printf("Tarefa recebida: %s\n", buffer);
     
-    while(strcmp(buffer, end) != 77) {
-        printf("%d\n",strcmp(buffer, "ENCERRAR\n"));
-        // Simular execução da tarefa
-        printf("Entrou no while\n");
-        sleep(5);
-        printf("Terminou sleep\n");
-        // Enviar resposta ao servidor
-        strcpy(buffer, "TAREFA_LIMPEZA CONCLUÍDA\n");
-        send(sockfd, buffer, strlen(buffer), 0);
-        printf("Mandando resposta para o servidor: %s\n", buffer);
+    // Entrar no loop e esperar mensagem do servidor
+    while(1) {
+        // Limpar o buffer antes de ler nova mensagem
+        memset(buffer, 0, sizeof(buffer));
 
         // Receber a tarefa do servidor
         read(sockfd, buffer, sizeof(buffer));
+        buffer[strcspn(buffer, "\r\n")] = 0;  // Limpar nova linha
         printf("Tarefa recebida: %s\n", buffer);
-        if (strcmp(buffer, "ENCERRAR\n") == 1) {
-            printf("Entrou no IF");
+
+        // Verificar se a mensagem é "ENCERRAR"
+        if (strcmp(buffer, "ENCERRAR") == 0) {
+            printf("Encerrando conexão...\n");
+            // Enviar resposta ao servidor
+            char connection_closed[MAXLINE];
+            strcpy(connection_closed, "Conexão encerrada");
+            send(sockfd, connection_closed, strlen(connection_closed), 0);
             break;
         }
+
+        // Simular execucao da tarefa com sleep
+        sleep(5);
+
+        // Guardar o valor anterior do buffer
+        char previous_task[MAXLINE];
+        strcpy(previous_task, buffer);  // Copiar o valor atual do buffer para 'previous_task'
+        snprintf(buffer, sizeof(buffer), "Tarefa %s concluída", previous_task);
+        
+        // Enviar resposta ao servidor
+        send(sockfd, buffer, strlen(buffer), 0);
     }
 
     while ( (n = read(sockfd, recvline, MAXLINE)) > 0) {
