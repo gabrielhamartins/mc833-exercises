@@ -22,7 +22,6 @@ int main (int argc, char **argv) {
     // time_t ticks;
     socklen_t len, len_client;
     char buffer[BUFFER_SIZE] = {0};
-    char end[BUFFER_SIZE] = "ENCERRAR\n";
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("socket");
@@ -63,7 +62,6 @@ int main (int argc, char **argv) {
             exit(1);
         }
 
-        // ticks = time(NULL);
         // Pega informações de IP e porta do cliente
         if (getpeername(connfd, (struct sockaddr *)&clientaddr, &len_client) < 0) {
             perror("getpeername");
@@ -73,19 +71,16 @@ int main (int argc, char **argv) {
         // Imprime informações IP e porta do cliente
         printf("IP remoto %s\n", inet_ntoa(clientaddr.sin_addr));
         printf("Porta remota %d\n", ntohs(clientaddr.sin_port));
-        
-        // snprintf(buf, sizeof(buf), "Hello from server!\nTime: %.24s\r\n", ctime(&ticks));
-
-        // write(connfd, buf, strlen(buf));
 
         // Criar um processo filho para cada cliente
         if (fork() == 0) {
 
             for(int i=0; i<3; i++) {
                 // Enviar tarefa para o cliente
-                strcpy(buffer, "TAREFA: LIMPEZA\n");
+                strcpy(buffer, "LIMPEZA\n");
                 send(connfd, buffer, strlen(buffer), 0);
                 printf("Enviou tarefa para o cliente: %s\n", buffer);
+
                 // Receber resposta do cliente
                 read(connfd, buffer, sizeof(buffer));
                 printf("Resposta - Cliente IP %s, Porta %d: %s\n", 
@@ -99,21 +94,30 @@ int main (int argc, char **argv) {
             }
 
             // Encerrar
-            strcpy(buffer, end);
+            strcpy(buffer, "ENCERRAR");
             send(connfd, buffer, strlen(buffer), 0);
+            
+            char last_message[BUFFER_SIZE];
+            strcpy(last_message, "ENCERRAR");
 
+            // Limpar o buffer antes de ler nova mensagem
+            memset(buffer, 0, sizeof(buffer));
 
+            // Receber resposta do cliente
+            read(connfd, buffer, sizeof(buffer));
+            printf("Resposta - Cliente IP %s, Porta %d: %s\n", 
+            inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), buffer);
+
+            // Log das interações em arquivo
+            FILE *log = fopen("log.txt", "a");
+            fprintf(log, "Cliente IP %s, Porta %d: Tarefa Enviada: %s, Resposta: %s\n",
+                    inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), last_message, buffer);
+            fclose(log);
 
             // Fechar conexão após finalizar
             close(connfd);
             exit(0);
         }
-
-        // Receber e imprimir a mensagem do cliente
-        // valread = read(connfd, buffer, BUFFER_SIZE);
-        // if (valread > 0) {
-        //     printf("Mensagem recebida do cliente: %s\n", buffer);
-        // }
 
         close(connfd);
     }
