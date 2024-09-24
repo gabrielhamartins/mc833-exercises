@@ -18,10 +18,8 @@
 #define BUFFER_SIZE 1024
 
 int main (int argc, char **argv) {
-    int    listenfd, connfd; //valread;
+    int    listenfd, connfd;
     struct sockaddr_in servaddr, clientaddr;
-    // char   buf[MAXDATASIZE];
-    // time_t ticks;
     socklen_t len, len_client;
     char buffer[BUFFER_SIZE] = {0};
     char message_received[BUFFER_SIZE];

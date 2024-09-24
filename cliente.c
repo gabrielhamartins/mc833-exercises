@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 #define MAXLINE 4096
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 8192
 
 int main(int argc, char **argv) {
     int    sockfd, n;
