@@ -58,6 +58,10 @@ int main (int argc, char **argv) {
         exit(1);
     }
 
+    FILE *log = fopen("log.txt", "a");
+    fprintf(log, "[PID %d] Processo pai iniciado\n", getpid());
+    fclose(log);
+
     for ( ; ; ) {
         len_client = sizeof(clientaddr);
         if ((connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &len_client)) == -1 ) {
@@ -71,14 +75,14 @@ int main (int argc, char **argv) {
             exit(EXIT_FAILURE);
         }
 
-        // Log de nova conexao
-        FILE *log = fopen("log.txt", "a");
-        fprintf(log, "[%s:%d] Conectado\n",
-                inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port));
-        fclose(log);
-
         // Criar um processo filho para cada cliente
         if (fork() == 0) {
+
+            // Log de nova conexao
+            FILE *log = fopen("log.txt", "a");
+            fprintf(log, "[%s:%d][PID %d] Conectado\n",
+                inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), getpid());
+            fclose(log);
 
             for(int i=0; i<3; i++) {
                 // Enviar tarefa para o cliente
@@ -92,8 +96,8 @@ int main (int argc, char **argv) {
 
                 // Log das interações em arquivo
                 FILE *log = fopen("log.txt", "a");
-                fprintf(log, "[%s:%d] Tarefa Enviada: %s | Resposta: %s\n",
-                        inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), message_sent, message_received);
+                fprintf(log, "[%s:%d][PID %d] Tarefa Enviada: %s | Resposta: %s\n",
+                        inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), getpid(), message_sent, message_received);
                 fclose(log);
             }
 
@@ -110,10 +114,10 @@ int main (int argc, char **argv) {
             read(connfd, buffer, sizeof(buffer));
 
             // Log das interações em arquivo
-            FILE *log = fopen("log.txt", "a");
-            fprintf(log, "[%s:%d] Tarefa Enviada: %s | Resposta: %s\n",
-                    inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), message_received, buffer);
-            fclose(log);
+            FILE *logEnd = fopen("log.txt", "a");
+            fprintf(logEnd, "[%s:%d][PID %d] Tarefa Enviada: %s | Resposta: %s\n",
+                    inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), getpid(), message_received, buffer);
+            fclose(logEnd);
 
             // Fechar conexão após finalizar
             close(connfd);
