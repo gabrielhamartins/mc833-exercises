@@ -1,3 +1,5 @@
+// Para compilar o arquivo, utilize: gcc -Wall cliente.c -o cliente
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>

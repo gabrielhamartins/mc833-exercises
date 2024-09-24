@@ -1,3 +1,5 @@
+// Para compilar o arquivo, utilize: gcc -Wall servidor.c -o servidor
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -71,9 +73,11 @@ int main (int argc, char **argv) {
             exit(EXIT_FAILURE);
         }
 
-        // Imprime informações IP e porta do cliente
-        printf("IP remoto %s\n", inet_ntoa(clientaddr.sin_addr));
-        printf("Porta remota %d\n", ntohs(clientaddr.sin_port));
+        // Log de nova conexao
+        FILE *log = fopen("log.txt", "a");
+        fprintf(log, "[%s:%d] Conectado\n",
+                inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port));
+        fclose(log);
 
         // Criar um processo filho para cada cliente
         if (fork() == 0) {
@@ -82,13 +86,10 @@ int main (int argc, char **argv) {
                 // Enviar tarefa para o cliente
                 strcpy(buffer, "LIMPEZA");
                 send(connfd, buffer, strlen(buffer), 0);
-                printf("Enviou tarefa para o cliente: %s\n", buffer);
                 strcpy(message_sent, buffer);
 
                 // Receber resposta do cliente
                 read(connfd, buffer, sizeof(buffer));
-                printf("Resposta - Cliente IP %s, Porta %d: %s\n", 
-                inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), buffer);
                 strcpy(message_received, buffer);
 
                 // Log das interações em arquivo
@@ -109,8 +110,6 @@ int main (int argc, char **argv) {
 
             // Receber resposta do cliente
             read(connfd, buffer, sizeof(buffer));
-            printf("Resposta - Cliente IP %s, Porta %d: %s\n", 
-            inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), buffer);
 
             // Log das interações em arquivo
             FILE *log = fopen("log.txt", "a");
