@@ -58,19 +58,24 @@ int main(int argc, char **argv) {
     }
 
     // Imprime endereço e porta
-    printf("Servidor rodando no endereço %s\n", inet_ntoa(servaddr.sin_addr));
-    printf("Servidor rodando na porta %d\n", ntohs(servaddr.sin_port));
+    // printf("Servidor rodando no endereço %s\n", inet_ntoa(servaddr.sin_addr));
+    // printf("Servidor rodando na porta %d\n", ntohs(servaddr.sin_port));
     
     // Entrar no loop e esperar mensagem do servidor
     while(1) {
+        // sleep(5);
         // Limpar o buffer antes de ler nova mensagem
         memset(buffer, 0, sizeof(buffer));
 
         // Receber a tarefa do servidor
         read(sockfd, buffer, sizeof(buffer));
         buffer[strcspn(buffer, "\r\n")] = 0;  // Limpar nova linha
-        printf("Tarefa recebida: %s\n", buffer);
-
+        if (strcmp(buffer, "") == 0) {
+            // printf("Cliente conectado: %d\n", getpid());
+        } else {
+            printf("Tarefa recebida: %s\n", buffer);
+        }
+            
         // Verificar se a mensagem é "ENCERRAR"
         if (strcmp(buffer, "ENCERRAR") == 0) {
             printf("Encerrando conexão...\n");

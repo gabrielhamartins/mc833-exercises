@@ -13,17 +13,25 @@
 #include <arpa/inet.h>
 
 
-#define LISTENQ 10
+#define BACKLOG 0
 #define MAXDATASIZE 100
 #define BUFFER_SIZE 1024
 
 int main (int argc, char **argv) {
-    int    listenfd, connfd;
+    int    listenfd, connfd, backlog;
     struct sockaddr_in servaddr, clientaddr;
     socklen_t len, len_client;
     char buffer[BUFFER_SIZE] = {0};
     char message_received[BUFFER_SIZE];
-    char message_sent[BUFFER_SIZE];
+    // char message_sent[BUFFER_SIZE];
+
+    // Verifica se o backlog foi passado como argumento
+    if (argc > 1) {
+        backlog = atoi(argv[1]);
+        // printf("Argumento recebido: %d \n", backlog);
+    } else {
+        backlog = BACKLOG;
+    }
 
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -52,8 +60,9 @@ int main (int argc, char **argv) {
 
     // Imprime a porta utilizada pelo servidor
     printf("Servidor rodando na porta %d\n", ntohs(servaddr.sin_port));
+    // int opt = 1;  // Nova variável
 
-    if (listen(listenfd, LISTENQ) == -1) {
+    if (listen(listenfd, backlog) < 0) {
         perror("listen");
         exit(1);
     }
@@ -62,18 +71,22 @@ int main (int argc, char **argv) {
     fprintf(log, "[PID %d] Processo pai iniciado\n", getpid());
     fclose(log);
 
+    sleep(10);
+
     for ( ; ; ) {
         len_client = sizeof(clientaddr);
         if ((connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &len_client)) == -1 ) {
             perror("accept");
             exit(1);
         }
-
+        
         // Pega informações de IP e porta do cliente
         if (getpeername(connfd, (struct sockaddr *)&clientaddr, &len_client) < 0) {
             perror("getpeername");
             exit(EXIT_FAILURE);
         }
+        
+        printf("Cliente conectado: %s:%d\n", inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port));
 
         // Criar um processo filho para cada cliente
         if (fork() == 0) {
@@ -83,23 +96,25 @@ int main (int argc, char **argv) {
             fprintf(log, "[%s:%d][PID %d] Conectado\n",
                 inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), getpid());
             fclose(log);
+        
+            sleep(10);
 
-            for(int i=0; i<3; i++) {
-                // Enviar tarefa para o cliente
-                strcpy(buffer, "LIMPEZA");
-                send(connfd, buffer, strlen(buffer), 0);
-                strcpy(message_sent, buffer);
+            // for(int i=0; i<3; i++) {
+            //     // Enviar tarefa para o cliente
+            //     strcpy(buffer, "LIMPEZA");
+            //     send(connfd, buffer, strlen(buffer), 0);
+            //     strcpy(message_sent, buffer);
 
-                // Receber resposta do cliente
-                read(connfd, buffer, sizeof(buffer));
-                strcpy(message_received, buffer);
+            //     // Receber resposta do cliente
+            //     read(connfd, buffer, sizeof(buffer));
+            //     strcpy(message_received, buffer);
 
-                // Log das interações em arquivo
-                FILE *log = fopen("log.txt", "a");
-                fprintf(log, "[%s:%d][PID %d] Tarefa Enviada: %s | Resposta: %s\n",
-                        inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), getpid(), message_sent, message_received);
-                fclose(log);
-            }
+            //     // Log das interações em arquivo
+            //     FILE *log = fopen("log.txt", "a");
+            //     fprintf(log, "[%s:%d][PID %d] Tarefa Enviada: %s | Resposta: %s\n",
+            //             inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), getpid(), message_sent, message_received);
+            //     fclose(log);
+            // }
 
             // Encerrar
             strcpy(buffer, "ENCERRAR");
@@ -123,8 +138,9 @@ int main (int argc, char **argv) {
             close(connfd);
             exit(0);
         }
-
-        close(connfd);
+     close(connfd);
+       
     }
+     close(listenfd);
     return(0);
 }
