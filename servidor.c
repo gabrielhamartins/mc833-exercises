@@ -23,7 +23,7 @@ int main (int argc, char **argv) {
     socklen_t len, len_client;
     char buffer[BUFFER_SIZE] = {0};
     char message_received[BUFFER_SIZE];
-    // char message_sent[BUFFER_SIZE];
+    char message_sent[BUFFER_SIZE];
 
     // Verifica se o backlog foi passado como argumento
     if (argc > 1) {
@@ -71,7 +71,8 @@ int main (int argc, char **argv) {
     fprintf(log, "[PID %d] Processo pai iniciado\n", getpid());
     fclose(log);
 
-    sleep(10);
+    // Remova o comentário para testar com o script `multiplosClientes.sh`
+    // sleep(10);
 
     for ( ; ; ) {
         len_client = sizeof(clientaddr);
@@ -97,24 +98,25 @@ int main (int argc, char **argv) {
                 inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), getpid());
             fclose(log);
         
-            sleep(10);
+            // Remova o comentário para testar com o script `multiplosClientes.sh`
+            // sleep(10);
 
-            // for(int i=0; i<3; i++) {
-            //     // Enviar tarefa para o cliente
-            //     strcpy(buffer, "LIMPEZA");
-            //     send(connfd, buffer, strlen(buffer), 0);
-            //     strcpy(message_sent, buffer);
+            for(int i=0; i<3; i++) {
+                // Enviar tarefa para o cliente
+                strcpy(buffer, "LIMPEZA");
+                send(connfd, buffer, strlen(buffer), 0);
+                strcpy(message_sent, buffer);
 
-            //     // Receber resposta do cliente
-            //     read(connfd, buffer, sizeof(buffer));
-            //     strcpy(message_received, buffer);
+                // Receber resposta do cliente
+                read(connfd, buffer, sizeof(buffer));
+                strcpy(message_received, buffer);
 
-            //     // Log das interações em arquivo
-            //     FILE *log = fopen("log.txt", "a");
-            //     fprintf(log, "[%s:%d][PID %d] Tarefa Enviada: %s | Resposta: %s\n",
-            //             inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), getpid(), message_sent, message_received);
-            //     fclose(log);
-            // }
+                // Log das interações em arquivo
+                FILE *log = fopen("log.txt", "a");
+                fprintf(log, "[%s:%d][PID %d] Tarefa Enviada: %s | Resposta: %s\n",
+                        inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), getpid(), message_sent, message_received);
+                fclose(log);
+            }
 
             // Encerrar
             strcpy(buffer, "ENCERRAR");
