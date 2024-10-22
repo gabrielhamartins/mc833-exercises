@@ -12,10 +12,18 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+#include <signal.h>       // Para capturar SIGCHLD
+#include <sys/wait.h>     // Para usar waitpid()
 
 #define BACKLOG 0
 #define MAXDATASIZE 100
 #define BUFFER_SIZE 1024
+
+// Função tratadora para SIGCHLD
+void sigchld_handler(int signo) {
+    // Espera qualquer processo filho que tenha terminado
+    while (waitpid(-1, NULL, WNOHANG) > 0);
+}
 
 int main (int argc, char **argv) {
     int    listenfd, connfd, backlog;
@@ -24,6 +32,18 @@ int main (int argc, char **argv) {
     char buffer[BUFFER_SIZE] = {0};
     char message_received[BUFFER_SIZE];
     char message_sent[BUFFER_SIZE];
+
+
+    // Configurar tratador de sinal para SIGCHLD
+    struct sigaction sa;
+    sa.sa_handler = sigchld_handler;    // Define a função tratadora
+    sigemptyset(&sa.sa_mask);           // Limpa a máscara de sinais
+    sa.sa_flags = SA_RESTART;           // Reinicia chamadas interrompidas
+    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+        perror("sigaction");
+        exit(1);
+    }
+    
 
     // Verifica se o backlog foi passado como argumento
     if (argc > 1) {
