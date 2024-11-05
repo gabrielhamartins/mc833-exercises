@@ -9,12 +9,35 @@
 void receber_resposta_completa(int sock, FILE *saida) {
     char buffer[256];
     int bytes_recebidos;
-    while ((bytes_recebidos = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
-        buffer[bytes_recebidos] = '\0';
-        fputs(buffer, saida);
-        fflush(saida);  // Assegura que os dados são gravados imediatamente
-        if (strstr(buffer, "-------------------------------") != NULL) {
+    fd_set readfds;
+    int done = 0;
+
+    while (!done) {
+        FD_ZERO(&readfds);
+        FD_SET(sock, &readfds);
+
+        int ret = select(sock + 1, &readfds, NULL, NULL, NULL);
+        if (ret < 0) {
+            perror("select");
             break;
+        }
+
+        if (FD_ISSET(sock, &readfds)) {
+            bytes_recebidos = recv(sock, buffer, sizeof(buffer) - 1, 0);
+            if (bytes_recebidos > 0) {
+                buffer[bytes_recebidos] = '\0';
+                fputs(buffer, saida);
+                fflush(saida);
+                if (strstr(buffer, "-------------------------------") != NULL) {
+                    done = 1;
+                }
+            } else if (bytes_recebidos == 0) {
+                // Conexão fechada
+                done = 1;
+            } else {
+                perror("recv");
+                done = 1;
+            }
         }
     }
 }
@@ -22,10 +45,10 @@ void receber_resposta_completa(int sock, FILE *saida) {
 void processar_entrada_e_resposta(int sock1, int sock2, FILE *entrada, FILE *saida) {
     char buffer[256];
 
-    // Enviar e gravar resposta completa do servidor 1
+    // Receber e gravar resposta completa do servidor 1 usando select()
     receber_resposta_completa(sock1, saida);
 
-    // Reinicia a leitura do arquivo de entrada e envia para o servidor 1
+    // Enviar dados para o servidor 1
     fseek(entrada, 0, SEEK_SET);
     while (fgets(buffer, sizeof(buffer), entrada)) {
         send(sock1, buffer, strlen(buffer), 0);
@@ -34,15 +57,22 @@ void processar_entrada_e_resposta(int sock1, int sock2, FILE *entrada, FILE *sai
     fputs("\n-------------------------------\n", saida);
     fflush(saida);
 
-    // Enviar e gravar resposta completa do servidor 2
+    // Indicar que não enviaremos mais dados para o servidor 1
+    shutdown(sock1, SHUT_WR);
+
+    // Receber e gravar resposta completa do servidor 2 usando select()
     receber_resposta_completa(sock2, saida);
 
-    // Reinicia a leitura do arquivo de entrada e envia para o servidor 2
+    // Enviar dados para o servidor 2
     fseek(entrada, 0, SEEK_SET);
     while (fgets(buffer, sizeof(buffer), entrada)) {
         send(sock2, buffer, strlen(buffer), 0);
         fputs(buffer, saida);
     }
+    fflush(saida);
+
+    // Indicar que não enviaremos mais dados para o servidor 2
+    shutdown(sock2, SHUT_WR);
 }
 
 int conectar_servidor(char *ip, int porta) {
