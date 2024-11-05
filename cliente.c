@@ -1,84 +1,96 @@
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
+// gcc -Wall cliente.c -o cliente
 #include <stdio.h>
-#include <netdb.h>
-#include <string.h>
-#include <errno.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/select.h>
 
-#define MAXLINE 4096
-#define BUFFER_SIZE 1024
-
-int main(int argc, char **argv) {
-    int    sockfd, n;
-    char   recvline[MAXLINE + 1];
-    char   error[MAXLINE + 1];
-    struct sockaddr_in servaddr;
-    socklen_t len;
-    char buffer[BUFFER_SIZE] = {0};
-
-    if (argc != 2) {
-        strcpy(error,"uso: ");
-        strcat(error,argv[0]);
-        strcat(error," <IPaddress>");
-        perror(error);
-        exit(1);
-    }
-
-    if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket error");
-        exit(1);
-    }
-
-    bzero(&servaddr, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    // Valor escolhido para porta no servidor
-    servaddr.sin_port   = htons(53348);
-    if (inet_pton(AF_INET, argv[1], &servaddr.sin_addr) <= 0) {
-        perror("inet_pton error");
-        exit(1);
-    }
-
-    if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
-        perror("connect error");
-        exit(1);
-    }
-
-    len = sizeof(servaddr);
-    // Pega o endereço IP e porta utilizado pelo servidor
-    if (getsockname(sockfd, (struct sockaddr *)&servaddr, &len) == -1) {
-        perror("getsockname");
-        exit(1);
-    }
-
-    // Imprime endereço e porta
-    printf("Servidor rodando no endereço %s\n", inet_ntoa(servaddr.sin_addr));
-    printf("Servidor rodando na porta %d\n", ntohs(servaddr.sin_port));
-
-    // Captura da mensagem do stdin
-    printf("Digite a mensagem para enviar ao servidor: ");
-    fgets(buffer, BUFFER_SIZE, stdin);
-
-    // Enviar mensagem para o servidor
-    send(sockfd, buffer, strlen(buffer), 0);
-    printf("Mensagem enviada\n");
-
-    while ( (n = read(sockfd, recvline, MAXLINE)) > 0) {
-        recvline[n] = 0;
-        if (fputs(recvline, stdout) == EOF) {
-            perror("fputs error");
-            exit(1);
+void receber_resposta_completa(int sock, FILE *saida) {
+    char buffer[256];
+    int bytes_recebidos;
+    while ((bytes_recebidos = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[bytes_recebidos] = '\0';
+        fputs(buffer, saida);
+        fflush(saida);  // Assegura que os dados são gravados imediatamente
+        if (strstr(buffer, "-------------------------------") != NULL) {
+            break;
         }
     }
+}
 
-    if (n < 0) {
-        perror("read error");
+void processar_entrada_e_resposta(int sock1, int sock2, FILE *entrada, FILE *saida) {
+    char buffer[256];
+
+    // Enviar e gravar resposta completa do servidor 1
+    receber_resposta_completa(sock1, saida);
+
+    // Reinicia a leitura do arquivo de entrada e envia para o servidor 1
+    fseek(entrada, 0, SEEK_SET);
+    while (fgets(buffer, sizeof(buffer), entrada)) {
+        send(sock1, buffer, strlen(buffer), 0);
+        fputs(buffer, saida);
+    }
+    fputs("\n-------------------------------\n", saida);
+    fflush(saida);
+
+    // Enviar e gravar resposta completa do servidor 2
+    receber_resposta_completa(sock2, saida);
+
+    // Reinicia a leitura do arquivo de entrada e envia para o servidor 2
+    fseek(entrada, 0, SEEK_SET);
+    while (fgets(buffer, sizeof(buffer), entrada)) {
+        send(sock2, buffer, strlen(buffer), 0);
+        fputs(buffer, saida);
+    }
+}
+
+int conectar_servidor(char *ip, int porta) {
+    int sock;
+    struct sockaddr_in server_addr;
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(porta);
+    inet_pton(AF_INET, ip, &server_addr.sin_addr);
+
+    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Erro ao conectar ao servidor");
         exit(1);
     }
 
-    exit(0);
+    return sock;
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 6) {
+        fprintf(stderr, "Uso: %s <IP> <porta1> <porta2> <arquivo_entrada> <arquivo_saida>\n", argv[0]);
+        exit(1);
+    }
+
+    char *ip = argv[1];
+    int porta1 = atoi(argv[2]);
+    int porta2 = atoi(argv[3]);
+    char *arquivo_entrada = argv[4];
+    char *arquivo_saida = argv[5];
+
+    FILE *entrada = fopen(arquivo_entrada, "r");
+    FILE *saida = fopen(arquivo_saida, "w");
+
+    if (entrada == NULL || saida == NULL) {
+        perror("Erro ao abrir arquivo");
+        exit(1);
+    }
+
+    int sock1 = conectar_servidor(ip, porta1);
+    int sock2 = conectar_servidor(ip, porta2);
+
+    processar_entrada_e_resposta(sock1, sock2, entrada, saida);
+
+    fclose(entrada);
+    fclose(saida);
+    close(sock1);
+    close(sock2);
+
+    return 0;
 }

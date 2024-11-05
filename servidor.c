@@ -1,89 +1,91 @@
+// gcc -Wall servidor.c -o servidor
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
-#include <netdb.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <time.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <time.h>
 
+void enviar_monitoramento(int client_sock, char* ip, int porta) {
+    char buffer[256];
 
-#define LISTENQ 10
-#define MAXDATASIZE 100
-#define BUFFER_SIZE 1024
+    // Gera horário formatado com o tempo atual
+    time_t agora = time(NULL);
+    struct tm *horario = localtime(&agora);
+    char horario_str[100];
+    strftime(horario_str, sizeof(horario_str), "%a %b %d %H:%M:%S %Y", horario);
 
-int main (int argc, char **argv) {
-    int    listenfd, connfd, valread;
-    struct sockaddr_in servaddr, clientaddr;
-    char   buf[MAXDATASIZE];
-    time_t ticks;
-    socklen_t len, len_client;
-    char buffer[BUFFER_SIZE] = {0};
+    // Inicializa o gerador de números aleatórios com uma semente única
+    srand(time(NULL) ^ client_sock ^ getpid());
 
-    if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("socket");
+    // Gera valores aleatórios para CPU, memória e status
+    int cpu = rand() % 101;       // CPU aleatório entre 0 e 100
+    int memoria = rand() % 101;    // Memória aleatória entre 0 e 100
+    char* status = (rand() % 2 == 0) ? "Ativo" : "Inativo";
+
+    // Formata a string de monitoramento com valores específicos para cada conexão
+    snprintf(buffer, sizeof(buffer),
+        "Monitoramento do servidor:\n"
+        "IP: %s\n"
+        "Porta: %d\n"
+        "Horário: %s\n"
+        "CPU: %d%%\n"
+        "Memória: %d%%\n"
+        "Status: %s\n"
+        "-------------------------------\n",
+        ip, porta, horario_str, cpu, memoria, status);
+
+    // Envia o monitoramento para o cliente
+    send(client_sock, buffer, strlen(buffer), 0);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Uso: %s <porta>\n", argv[0]);
         exit(1);
     }
 
-    bzero(&servaddr, sizeof(servaddr));
-    servaddr.sin_family      = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    // Utilizando a porta 53348
-    // Para automatizar a escolha de uma porta utilizar `htons(0)`
-    servaddr.sin_port        = htons(53348);   
+    int porta = atoi(argv[1]);
+    int server_sock, client_sock;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t addr_len = sizeof(client_addr);
 
-    if (bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
-        perror("bind");
-        exit(1);
-    }
+    // Cria o socket do servidor
+    server_sock = socket(AF_INET, SOCK_STREAM, 0);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(porta);
 
-    len = sizeof(servaddr);
-    // Pega o endereço da conexão
-    if (getsockname(listenfd, (struct sockaddr *)&servaddr, &len) == -1) {
-        perror("getsockname");
-        exit(1);
-    }
+    bind(server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
+    listen(server_sock, 5);
 
-    // Imprime a porta utilizada pelo servidor
-    printf("Servidor rodando na porta %d\n", ntohs(servaddr.sin_port));
+    printf("Servidor iniciado na porta %d\n", porta);
 
-    if (listen(listenfd, LISTENQ) == -1) {
-        perror("listen");
-        exit(1);
-    }
+    while (1) {
+        // Aceita uma nova conexão de cliente
+        client_sock = accept(server_sock, (struct sockaddr*)&client_addr, &addr_len);
 
-    for ( ; ; ) {
-        len_client = sizeof(clientaddr);
-        if ((connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &len_client)) == -1 ) {
-            perror("accept");
-            exit(1);
+        if (client_sock >= 0) {
+            // Obtém o IP do cliente
+            char *ip_cliente = inet_ntoa(client_addr.sin_addr);
+            
+            // Gera e envia o monitoramento específico para essa conexão
+            enviar_monitoramento(client_sock, ip_cliente, porta);
+
+            char buffer[256];
+            int bytes_recebidos;
+
+            // Recebe e ecoa mensagens do cliente até a desconexão
+            while ((bytes_recebidos = recv(client_sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+                buffer[bytes_recebidos] = '\0';
+                send(client_sock, buffer, bytes_recebidos, 0); // Envia o eco ao cliente
+            }
+
+            // Fecha a conexão com o cliente
+            close(client_sock);
         }
-
-        ticks = time(NULL);
-        // Pega informações de IP e porta do cliente
-        if (getpeername(connfd, (struct sockaddr *)&clientaddr, &len_client) < 0) {
-            perror("getpeername");
-            exit(EXIT_FAILURE);
-        }
-
-        // Imprime informações IP e porta do cliente
-        printf("IP remoto %s\n", inet_ntoa(clientaddr.sin_addr));
-        printf("Porta remota %d\n", ntohs(clientaddr.sin_port));
-        
-        snprintf(buf, sizeof(buf), "Hello from server!\nTime: %.24s\r\n", ctime(&ticks));
-
-        write(connfd, buf, strlen(buf));
-
-        // Receber e imprimir a mensagem do cliente
-        valread = read(connfd, buffer, BUFFER_SIZE);
-        if (valread > 0) {
-            printf("Mensagem recebida do cliente: %s\n", buffer);
-        }
-
-        close(connfd);
     }
-    return(0);
+
+    close(server_sock);
+    return 0;
 }
