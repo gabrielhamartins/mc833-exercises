@@ -110,7 +110,7 @@ void get_user_list(char *list) {
 
 // Função para registrar eventos no log
 void log_event(char *event) {
-    FILE *log_file = fopen("server.log", "a");
+    FILE *log_file = fopen("servidor.log", "a");
     if (!log_file) {
         perror("Erro ao abrir o arquivo de log");
         return;
@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Inicializa o log
-    FILE *log_file = fopen("server.log", "w");
+    FILE *log_file = fopen("servidor.log", "w");
     if (!log_file) {
         perror("Erro ao criar o arquivo de log");
         exit(EXIT_FAILURE);
