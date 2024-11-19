@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
             printf("Você saiu do chat.\n");
             running = 0; // Sinaliza para as threads que o programa está encerrando
 
-            // Encerra a conexão TCP de forma graciosa
+            // Encerra a conexão TCP
             shutdown(tcp_sock, SHUT_RDWR);
             close(tcp_sock);
 
@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Fecha os sockets (redundante, mas por segurança)
+    // Fecha os sockets
     close(tcp_sock);
     close(udp_sock);
 

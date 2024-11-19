@@ -170,18 +170,18 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Cria socket UDP para receber notificações (opcional)
+    // Cria socket UDP para receber notificações
     if ((udp_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("Erro ao criar socket UDP");
         exit(EXIT_FAILURE);
     }
 
-    // Configurações do servidor UDP (opcional)
+    // Configurações do servidor UDP
     udp_server_addr.sin_family = AF_INET;
     udp_server_addr.sin_port = htons(0); // Porta 0, não precisamos receber dados
     udp_server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    // Faz o bind do socket UDP (opcional)
+    // Faz o bind do socket UDP
     if (bind(udp_sock, (struct sockaddr *)&udp_server_addr, sizeof(udp_server_addr)) < 0) {
         perror("Erro ao fazer bind no socket UDP");
         exit(EXIT_FAILURE);
