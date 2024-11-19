@@ -1,126 +1,164 @@
-// gcc -Wall cliente.c -o cliente
+// client.c
+// Cliente para o serviço de bate-papo com notificações de status
+// Compilar com: gcc -Wall -o client client.c -pthread
+// Executar com: ./client <IP_DO_SERVIDOR> <PORTA_TCP>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <arpa/inet.h>
-#include <sys/select.h>
+#include <sys/socket.h>
 
-void receber_resposta_completa(int sock, FILE *saida) {
-    char buffer[256];
-    int bytes_recebidos;
-    fd_set readfds;
-    int done = 0;
+// Definições de porta
+#define BUFFER_SIZE 1024
 
-    while (!done) {
-        FD_ZERO(&readfds);
-        FD_SET(sock, &readfds);
+// Nickname do usuário
+char nickname[50];
 
-        int ret = select(sock + 1, &readfds, NULL, NULL, NULL);
-        if (ret < 0) {
-            perror("select");
-            break;
-        }
+// Lista de usuários conectados
+char user_list[BUFFER_SIZE];
 
-        if (FD_ISSET(sock, &readfds)) {
-            bytes_recebidos = recv(sock, buffer, sizeof(buffer) - 1, 0);
-            if (bytes_recebidos > 0) {
-                buffer[bytes_recebidos] = '\0';
-                fputs(buffer, saida);
-                fflush(saida);
-                if (strstr(buffer, "-------------------------------") != NULL) {
-                    done = 1;
-                }
-            } else if (bytes_recebidos == 0) {
-                // Conexão fechada
-                done = 1;
-            } else {
-                perror("recv");
-                done = 1;
-            }
-        }
+// Função para receber mensagens TCP (bate-papo)
+void *receive_tcp_messages(void *arg) {
+    int tcp_sock = *((int *)arg);
+    char buffer[BUFFER_SIZE];
+    int bytes_received;
+
+    while ((bytes_received = recv(tcp_sock, buffer, BUFFER_SIZE, 0)) > 0) {
+        buffer[bytes_received] = '\0';
+        printf("%s\n", buffer);
     }
+
+    // Se a conexão for encerrada
+    if (bytes_received == 0) {
+        printf("Conexão encerrada pelo servidor.\n");
+        exit(0);
+    } else {
+        perror("recv");
+    }
+
+    return NULL;
 }
 
-void processar_entrada_e_resposta(int sock1, int sock2, FILE *entrada, FILE *saida) {
-    char buffer[256];
-
-    // Receber e gravar resposta completa do servidor 1 usando select()
-    receber_resposta_completa(sock1, saida);
-
-    // Enviar dados para o servidor 1
-    fseek(entrada, 0, SEEK_SET);
-    while (fgets(buffer, sizeof(buffer), entrada)) {
-        send(sock1, buffer, strlen(buffer), 0);
-        fputs(buffer, saida);
-    }
-    fputs("\n-------------------------------\n", saida);
-    fflush(saida);
-
-    // Indicar que não enviaremos mais dados para o servidor 1
-    shutdown(sock1, SHUT_WR);
-
-    // Receber e gravar resposta completa do servidor 2 usando select()
-    receber_resposta_completa(sock2, saida);
-
-    // Enviar dados para o servidor 2
-    fseek(entrada, 0, SEEK_SET);
-    while (fgets(buffer, sizeof(buffer), entrada)) {
-        send(sock2, buffer, strlen(buffer), 0);
-        fputs(buffer, saida);
-    }
-    fflush(saida);
-
-    // Indicar que não enviaremos mais dados para o servidor 2
-    shutdown(sock2, SHUT_WR);
-}
-
-int conectar_servidor(char *ip, int porta) {
-    int sock;
+// Função para receber notificações UDP (status)
+void *receive_udp_notifications(void *arg) {
+    int udp_sock = *((int *)arg);
+    char buffer[BUFFER_SIZE];
     struct sockaddr_in server_addr;
+    socklen_t addr_len = sizeof(server_addr);
+    int bytes_received;
 
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(porta);
-    inet_pton(AF_INET, ip, &server_addr.sin_addr);
+    while ((bytes_received = recvfrom(udp_sock, buffer, BUFFER_SIZE, 0,
+                                      (struct sockaddr *)&server_addr, &addr_len)) > 0) {
+        buffer[bytes_received] = '\0';
+        printf("[NOTIFICAÇÃO]: %s\n", buffer);
 
-    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        perror("Erro ao conectar ao servidor");
-        exit(1);
+        // Atualiza a lista de usuários se for uma mensagem de atualização
+        if (strstr(buffer, "Usuários conectados:") != NULL) {
+            strcpy(user_list, buffer);
+        }
     }
 
-    return sock;
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 6) {
-        fprintf(stderr, "Uso: %s <IP> <porta1> <porta2> <arquivo_entrada> <arquivo_saida>\n", argv[0]);
-        exit(1);
+    int tcp_sock, udp_sock;
+    struct sockaddr_in tcp_server_addr;
+    pthread_t tcp_thread, udp_thread;
+    char message[BUFFER_SIZE];
+
+    if (argc != 3) {
+        printf("Uso: %s <IP_DO_SERVIDOR> <PORTA_TCP>\n", argv[0]);
+        exit(EXIT_FAILURE);
     }
 
-    char *ip = argv[1];
-    int porta1 = atoi(argv[2]);
-    int porta2 = atoi(argv[3]);
-    char *arquivo_entrada = argv[4];
-    char *arquivo_saida = argv[5];
+    // Solicita o nickname do usuário
+    printf("Digite seu nickname: ");
+    fgets(nickname, sizeof(nickname), stdin);
+    nickname[strcspn(nickname, "\n")] = '\0'; // Remove o newline
 
-    FILE *entrada = fopen(arquivo_entrada, "r");
-    FILE *saida = fopen(arquivo_saida, "w");
-
-    if (entrada == NULL || saida == NULL) {
-        perror("Erro ao abrir arquivo");
-        exit(1);
+    // Cria socket TCP
+    if ((tcp_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Erro ao criar socket TCP");
+        exit(EXIT_FAILURE);
     }
 
-    int sock1 = conectar_servidor(ip, porta1);
-    int sock2 = conectar_servidor(ip, porta2);
+    // Configurações do servidor TCP
+    tcp_server_addr.sin_family = AF_INET;
+    tcp_server_addr.sin_port = htons(atoi(argv[2]));
+    tcp_server_addr.sin_addr.s_addr = inet_addr(argv[1]);
 
-    processar_entrada_e_resposta(sock1, sock2, entrada, saida);
+    // Conecta ao servidor TCP
+    if (connect(tcp_sock, (struct sockaddr *)&tcp_server_addr, sizeof(tcp_server_addr)) < 0) {
+        perror("Erro ao conectar ao servidor TCP");
+        exit(EXIT_FAILURE);
+    }
 
-    fclose(entrada);
-    fclose(saida);
-    close(sock1);
-    close(sock2);
+    // Cria socket UDP
+    if ((udp_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("Erro ao criar socket UDP");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configurações do socket UDP para bind em qualquer porta (porta 0)
+    struct sockaddr_in udp_client_addr;
+    udp_client_addr.sin_family = AF_INET;
+    udp_client_addr.sin_port = htons(0); // Porta 0 para o sistema escolher
+    udp_client_addr.sin_addr.s_addr = INADDR_ANY;
+
+    // Faz o bind do socket UDP
+    if (bind(udp_sock, (struct sockaddr *)&udp_client_addr, sizeof(udp_client_addr)) < 0) {
+        perror("Erro ao fazer bind no socket UDP");
+        exit(EXIT_FAILURE);
+    }
+
+    // Obtém a porta UDP atribuída
+    socklen_t udp_len = sizeof(udp_client_addr);
+    if (getsockname(udp_sock, (struct sockaddr *)&udp_client_addr, &udp_len) == -1) {
+        perror("Erro ao obter informações do socket UDP");
+        exit(EXIT_FAILURE);
+    }
+    int udp_port = ntohs(udp_client_addr.sin_port);
+
+    // Envia o nickname e a porta UDP ao servidor
+    char initial_info[BUFFER_SIZE];
+    sprintf(initial_info, "%s:%d", nickname, udp_port);
+    if (send(tcp_sock, initial_info, strlen(initial_info), 0) < 0) {
+        perror("Erro ao enviar informações iniciais ao servidor");
+        exit(EXIT_FAILURE);
+    }
+
+    // Inicia thread para receber mensagens TCP
+    pthread_create(&tcp_thread, NULL, receive_tcp_messages, (void *)&tcp_sock);
+
+    // Inicia thread para receber notificações UDP
+    pthread_create(&udp_thread, NULL, receive_udp_notifications, (void *)&udp_sock);
+
+    // Loop para enviar mensagens ao servidor
+    while (1) {
+        fgets(message, BUFFER_SIZE, stdin);
+        message[strcspn(message, "\n")] = '\0'; // Remove o newline
+
+        // Verifica se o usuário deseja sair
+        if (strcmp(message, "/sair") == 0) {
+            printf("Você saiu do chat.\n");
+            close(tcp_sock);
+            close(udp_sock);
+            exit(0);
+        }
+
+        // Envia a mensagem ao servidor TCP
+        if (send(tcp_sock, message, strlen(message), 0) < 0) {
+            perror("Erro ao enviar mensagem ao servidor");
+        }
+    }
+
+    // Fecha os sockets
+    close(tcp_sock);
+    close(udp_sock);
 
     return 0;
 }

@@ -1,3 +1,0 @@
-Teste de entrada para o cliente
-Simulacao de multiplexacao de E/S
-Turma de Redes 2024
