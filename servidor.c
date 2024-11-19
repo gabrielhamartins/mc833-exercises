@@ -18,6 +18,7 @@
 
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 1024
+#define BUFFER_SIZE_2 2048 
 
 // Estrutura para armazenar informações do cliente
 typedef struct {
@@ -318,7 +319,7 @@ int main(int argc, char *argv[]) {
                         buffer[bytes_received] = '\0';
 
                         // Prepara a mensagem para encaminhar
-                        sprintf(message, "%s: %s", cli->nickname, buffer);
+                        snprintf(message, BUFFER_SIZE_2, "%s: %s", cli->nickname, buffer);
 
                         // Registra a mensagem no log
                         log_event(message);
